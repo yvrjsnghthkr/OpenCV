@@ -1,38 +1,57 @@
 import cv2 as cv
 import numpy as np
 import face_recognition
+import os
 
-vid_capture=cv.VideoCapture(0)
-yv_image = face_recognition.load_image_file("/Users/yvrjsnghthkr/Desktop/YuvrajRecog.jpeg")
-yv_encoding= face_recognition.face_encodings(yv_image)[0]
-known_face_encodings=[
-    yv_encoding
-]
-known_face_names=[
-    "yv"
-]
+path = '/Users/yvrjsnghthkr/Desktop/yvcodes/OpenCV/Advance/faces'
+faces = []
+known_faces = []
+myList = os.listdir(path)
+#print(myList)
+#USe 'find . -name ".DS_Store" -delete' if .DS_Store file appears
+
+for cls in myList:
+    current_img = cv.imread(f'{path}/{cls}')
+    faces.append(current_img)
+    known_faces.append(os.path.splitext(cls)[0])
+#print(known_faces)
+def findEncodings(images):
+    encodefaces = []
+    for img in images:
+        img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+        encode = face_recognition.face_encodings(img)[0]
+        encodefaces.append(encode)
+    return encodefaces
+
+knownEncodings = findEncodings(faces)
+#print(len(knownEncodings))
+
+vid = cv.VideoCapture(0)
 while True:
-    ret, frame=vid_capture.read()
-    rgb_frame=frame[:,:,::-1]
-    face_locations= face_recognition.face_locations(rgb_frame)
-    face_encodings=face_recognition.face_encodings(rgb_frame,face_locations)
-    
-    for face_encoding in face_encodings:
-        matches=face_recognition.compare_faces(known_face_encodings,known_face_names)
-        name="Unknown"
-        if matches:
-            name=known_face_names[0]
-    for (top,right ,bottom,left), name in zip(face_locations,face_encodings):
-        if True in matches:
-            first_match_index=matches.index(True)
-            name=known_face_names[first_match_index]
-            print("Match found:", name)
-        cv.rectangle(frame,(left,bottom-35),(right,bottom),(0,0,225),cv.FILLED)
-        font=cv.FONT_HERSHEY_COMPLEX
-        cv.putText(frame,name,(left+6,bottom-6),font,1.0,(225,225,225),1)
-    cv.imshow('Vid',frame)
-    
-    if cv.waitKey(1) == ord('q'):
+    ret, frame = vid.read()
+    images = cv.resize(frame, (0, 0), None, 0.25, 0.25)
+    images = cv.cvtColor(images, cv.COLOR_BGR2RGB)
+
+    CurrentFrameFaces = face_recognition.face_locations(images)
+    CurrentFrameEncode = face_recognition.face_encodings(images, CurrentFrameFaces)
+
+    for FaceEncodes, FaceLoc in zip(CurrentFrameEncode, CurrentFrameFaces):
+        matches = face_recognition.compare_faces(knownEncodings, FaceEncodes)
+        faceDis = face_recognition.face_distance(knownEncodings, FaceEncodes)
+        # print(faceDis)
+        matchIndex = np.argmin(faceDis)
+
+        if matches[matchIndex]:
+            name = known_faces[matchIndex].upper()
+            # print(name)
+            y1, x2, y2, x1 = FaceLoc
+            y1, x2, y2, x1 = y1 * 4, x2 * 4, y2 * 4, x1 * 4
+            cv.rectangle(frame, (x1, y1), (x2, y2), (0, 225, 0), 2)
+            cv.rectangle(frame, (x1, y2 - 35), (x2, y2), (0, 0, 0),2)
+            cv.putText(frame, name, (x1 + 6, y2 - 6), cv.FONT_HERSHEY_COMPLEX_SMALL, 1, (0, 0,225), 1)
+
+    cv.imshow('Webcam', frame)
+    if cv.waitKey(1) & 0xFF == ord('q'):
         break
-vid_capture.release()
+vid.release()
 cv.destroyAllWindows()
